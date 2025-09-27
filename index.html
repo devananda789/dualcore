@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Study Buddy Tracker</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 700px;
+      margin: 20px auto;
+      padding: 0 10px;
+    }
+    h1, h2 {
+      color: #2c3e50;
+    }
+    input, select, textarea, button {
+      width: 100%;
+      padding: 8px;
+      margin: 6px 0 12px 0;
+      box-sizing: border-box;
+    }
+    button {
+      cursor: pointer;
+      background-color: #3498db;
+      color: white;
+      border: none;
+      font-weight: bold;
+    }
+    button:hover {
+      background-color: #2980b9;
+    }
+    .hidden {
+      display: none;
+    }
+    .buddy {
+      border-bottom: 1px solid #ddd;
+      padding: 8px 0;
+    }
+    .buddy button {
+      width: auto;
+      margin-top: 0;
+    }
+    .notification {
+      background: #dff0d8;
+      color: #3c763d;
+      padding: 8px;
+      margin-bottom: 10px;
+      border-radius: 4px;
+    }
+    label {
+      font-weight: bold;
+      margin-top: 12px;
+      display: block;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Study Buddy Tracker</h1>
+
+  <!-- LOGIN SECTION -->
+  <section id="login-section">
+    <h2>Login</h2>
+    <input type="email" id="login-email" placeholder="Email" required />
+    <input type="password" id="login-password" placeholder="Password" required />
+    <button id="login-btn">Login</button>
+  </section>
+
+  <!-- DASHBOARD SECTION -->
+  <section id="dashboard-section" class="hidden">
+    <h2>Dashboard</h2>
+    <p><strong>Welcome, <span id="user-name"></span>!</strong></p>
+    <p>Next session: <span id="next-session">None scheduled</span></p>
+    <p>Points: <span id="user-points">0</span></p>
+    <button id="logout-btn" style="width:auto; background:#e74c3c;">Logout</button>
+  </section>
+
+  <!-- PROFILE SECTION -->
+  <section id="profile-section" class="hidden">
+    <h2>Profile</h2>
+    <label for="profile-subjects">Subjects of Interest (comma separated):</label>
+    <input type="text" id="profile-subjects" placeholder="e.g. Math, Science" />
+
+    <label for="profile-timezone">Time Zone:</label>
+    <input type="text" id="profile-timezone" placeholder="e.g. UTC+0" />
+
+    <label for="profile-availability">Availability:</label>
+    <input type="text" id="profile-availability" placeholder="e.g. Weekdays 6-8pm" />
+
+    <button id="save-profile-btn">Save Profile</button>
+  </section>
+
+  <!-- BUDDY SEARCH SECTION -->
+  <section id="buddy-search-section" class="hidden">
+    <h2>Find Study Buddies</h2>
+    <input type="text" id="search-subject" placeholder="Subject" />
+    <input type="text" id="search-language" placeholder="Language" />
+    <input type="text" id="search-location" placeholder="Location" />
+    <div id="buddy-results"></div>
+  </section>
+
+  <!-- SESSION SCHEDULER SECTION -->
+  <section id="session-scheduler-section" class="hidden">
+    <h2>Schedule Study Session</h2>
+    <input type="text" id="session-title" placeholder="Session Title" />
+    <select id="session-type">
+      <option value="1:1">1:1</option>
+      <option value="group">Group</option>
+    </select>
+    <input type="date" id="session-date" />
+    <input type="time" id="session-time" />
+    <button id="schedule-session-btn">Schedule Session</button>
+  </section>
+
+  <!-- NOTES SECTION -->
+  <section id="notes-section" class="hidden">
+    <h2>Notes</h2>
+    <textarea id="note-text" rows="4" placeholder="Write a note..."></textarea>
+    <button id="add-note-btn">Add Note</button>
+    <ul id="notes-list"></ul>
+  </section>
+
+<script>
+  // Dummy data for buddies
+  const buddies = [
+    { id: 1, name: "Alice", subjects: ["Math", "Physics"], language: "English", location: "USA" },
+    { id: 2, name: "Bob", subjects: ["Biology"], language: "Spanish", location: "Spain" },
+    { id: 3, name: "Charlie", subjects: ["Math"], language: "English", location: "UK" },
+  ];
+
+  // State variables
+  let currentUser = null;
+  let userProfile = {
+    name: "John Doe",
+    subjects: ["Math", "Science"],
+    timeZone: "UTC+0",
+    availability: "Weekdays 6-8pm",
+    points: 50,
+    nextSession: null,
+    notes: [],
+  };
+
+  // Elements
+  const loginSection = document.getElementById("login-section");
+  const dashboardSection = document.getElementById("dashboard-section");
+  const profileSection = document.getElementById("profile-section");
+  const buddySearchSection = document.getElementById("buddy-search-section");
+  const sessionSchedulerSection = document.getElementById("session-scheduler-section");
+  const notesSection = document.getElementById("notes-section");
+
+  const loginBtn = document.getElementById("login-btn");
+  const logoutBtn = document.getElementById("logout-btn");
+  const saveProfileBtn = document.getElementById("save-profile-btn");
+  const scheduleSessionBtn = document.getElementById("schedule-session-btn");
+  const addNoteBtn = document.getElementById("add-note-btn");
+
+  const userNameSpan = document.getElementById("user-name");
+  const userPointsSpan = document.getElementById("user-points");
+  const nextSessionSpan = document.getElementById("next-session");
+
+  const profileSubjectsInput = document.getElementById("profile-subjects");
+  const profileTimeZoneInput = document.getElementById("profile-timezone");
+  const profileAvailabilityInput = document.getElementById("profile-availability");
+
+  const buddyResultsDiv = document.getElementById("buddy-results");
+
+  const searchSubjectInput = document.getElementById("search-subject");
+  const searchLanguageInput = document.getElementById("search-language");
+  const searchLocationInput = document.getElementById("search-location");
+
+  const noteTextArea = document.getElementById("note-text");
+  const notesList = document.getElementById("notes-list");
+
+  // Login handler
+  loginBtn.onclick = () => {
+    const email = document.getElementById("login-email").value.trim();
+    const password = document.getElementById("login-password").value.trim();
+    if (!email || !password) {
+      alert("Please enter email and password");
+      return;
+    }
+    currentUser = email;
+    userNameSpan.textContent = userProfile.name;
+    userPointsSpan.textContent = userProfile.points;
+    nextSessionSpan.textContent = userProfile.nextSession || "None scheduled";
+
+    // Fill profile form
+    profileSubjectsInput.value = userProfile.subjects.join(", ");
+    profileTimeZoneInput.value = userProfile.timeZone;
+    profileAvailabilityInput.value = userProfile.availability;
+
+    // Show sections
+    loginSection.classList.add("hidden");
+    dashboardSection.classList.remove("hidden");
+    profileSection.classList.remove("hidden");
+    buddySearchSection.classList.remove("hidden");
+    sessionSchedulerSection.classList.remove("hidden");
+    notesSection.classList.remove("hidden");
+
+    alert("Logged in successfully!");
+  };
+
+  // Logout handler
+  logoutBtn.onclick = () => {
+    if (confirm("Are you sure you want to logout?")) {
+      currentUser = null;
+      userProfile.nextSession = null;
+      userProfile.notes = [];
+      notesList.innerHTML = "";
+      document.getElementById("login-email").value = "";
+      document.getElementById("login-password").value = "";
+
+      loginSection.classList.remove("hidden");
+      dashboardSection.classList.add("hidden");
+      profileSection.classList.add("hidden");
+      buddySearchSection.classList.add("hidden");
+      sessionSchedulerSection.classList.add("hidden");
+      notesSection.classList.add("hidden");
+    }
+  };
+
+  // Save profile handler
+  saveProfileBtn.onclick = () => {
+    userProfile.subjects = profileSubjectsInput.value.split(",").map(s => s.trim()).filter(s => s);
+    userProfile.timeZone = profileTimeZoneInput.value.trim();
+    userProfile.availability = profileAvailabilityInput.value.trim();
+    alert("Profile updated!");
+  };
+
+  // Buddy search handler
+  function displayBuddies() {
+    const subjectFilter = searchSubjectInput.value.trim().toLowerCase();
+    const languageFilter = searchLanguageInput.value.trim().toLowerCase();
+    const locationFilter = searchLocationInput.value.trim().toLowerCase();
+
+    const filtered = buddies.filter(buddy => {
+      const subjectMatch = !subjectFilter || buddy.subjects.some(s => s.toLowerCase().includes(subjectFilter));
+      const languageMatch = !languageFilter || buddy.language.toLowerCase().includes(languageFilter);
+      const locationMatch = !locationFilter || buddy.location.toLowerCase().includes(locationFilter);
+      return subjectMatch && languageMatch && locationMatch;
+    });
+
+    if (filtered.length === 0) {
+      buddyResultsDiv.innerHTML = "<p>No buddies found.</p>";
+      return;
+    }
+
+    buddyResultsDiv.innerHTML = "";
+    filtered.forEach(buddy => {
+      const div = document.createElement("div");
+      div.className = "buddy";
+      div.innerHTML = `<strong>${buddy.name}</strong> — Subjects: ${buddy.subjects.join(", ")} — Language: ${buddy.language} — Location: ${buddy.location}`;
+      const btn = document.createElement("button");
+      btn.textContent = "Send Request";
+      btn.onclick = () => alert(`Buddy request sent to ${buddy.name}`);
+      div.appendChild(btn);
+      buddyResultsDiv.appendChild(div);
+    });
+  }
+  searchSubjectInput.oninput = displayBuddies;
+  searchLanguageInput.oninput = displayBuddies;
+  searchLocationInput.oninput = displayBuddies;
+
+  // Initial display buddies
+  displayBuddies();
+
+  // Schedule session handler
+  scheduleSessionBtn.onclick = () => {
+    const title = document.getElementById("session-title").value.trim();
+    const type = document.getElementById("session-type").value;
+    const date = document.getElementById("session-date").value;
+    const time = document.getElementById("session-time").value;
+
+    if (!title || !date || !time) {
+      alert("Please fill all required fields to schedule session");
+      return;
+    }
+
+    userProfile.nextSession = `${title} (${type}) on ${date} at ${time}`;
+    nextSessionSpan.textContent = userProfile.nextSession;
+
+    alert(`Session "${title}" scheduled on ${date} at ${time}`);
+
+    // Clear inputs
+    document.getElementById("session-title").value = "";
+    document.getElementById("session-date").value = "";
+    document.getElementById("session-time").value = "";
+  };
+
+  // Add note handler
+  addNoteBtn.onclick = () => {
+    const text = noteTextArea.value.trim();
+    if (!text) return alert("Please write something before adding a note.");
+
+    userProfile.notes.unshift(text);
+
+    const li = document.createElement("li");
+    li.textContent = text;
+    notesList.prepend(li);
+
+    noteTextArea.value = "";
+  };
+</script>
+
+</body>
+</html>
+
+
+}<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Study Buddy Tracker — Single File</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+<style>
+:root { --bg:#f5f7fb; --card:#fff; --accent:#6C63FF; --accent-2:#8F7CFF; --muted:#6b7280; --success:#34c759; --danger:#ff5c5c; }
+*{box-sizing:border-box}
+body{font-family:Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial; background:linear-gradient(180deg, var(--bg), #eef2ff); margin:0; color:#111}
+.container{max-width:1100px;margin:28px auto;padding:20px}
+header{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px}
+.brand{display:flex;align-items:center;gap:12px}
+.logo{width:44px;height:44px;background:linear-gradient(135deg,var(--accent),var(--accent-2));border-radius:10px;display:grid;place-items:center;color:white;font-weight:700;box-shadow:0 6px 18px rgba(99,95,255,0.18)}
+h1{font-size:20px;margin:0}
+.controls{display:flex;gap:10px;align-items:center}
+.button{background:var(--accent); color:white; padding:10px 12px;border-radius:10px;border:0;cursor:pointer;box-shadow:0 6px 18px rgba(99,95,255,0.14)}
+.button.ghost{background:transparent;color:var(--accent);border:1px solid rgba(108,99,255,0.14)}
+.grid{display:grid;grid-template-columns:1fr 360px;gap:20px}
+.card{background:var(--card);border-radius:12px;padding:18px;box-shadow:0 6px 20px rgba(15,23,42,0.06)}
+.form-row{display:flex;gap:10px;margin-bottom:12px}
+.input, .select{flex:1;padding:10px;border-radius:8px;border:1px solid #e6e9f2;font-size:14px}
+.small{width:120px}
+.progress-wrap{margin-top:12px}
+.progress{height:14px;background:#eef1ff;border-radius:999px;overflow:hidden}
+.progress-fill{height:100%;width:0;background:linear-gradient(90deg,var(--accent),var(--accent-2));border-radius:999px;transition:width .45s ease}
+.list{list-style:none;padding:0;margin:0;display:grid;gap:10px}
+.item{display:flex;align-items:center;justify-content:space-between;padding:10px;border-radius:10px;border:1px solid #f0f2ff}
+.item .meta{display:flex;align-items:center;gap:10px}
+.badge{background:#f5f7ff;padding:6px 8px;border-radius:8px;font-size:13px;color:var(--muted)}
+.trash{background:transparent;border:0;color:var(--danger);cursor:pointer;font-weight:700}
+.summary{display:flex;flex-direction:column;gap:8px}
+.note{font-size:13px;color:var(--muted)}
+.footer{margin-top:18px;text-align:center;color:var(--muted);font-size:13px}
+@media (max-width:860px){.grid{grid-template-columns:1fr}.controls{flex-wrap:wrap} .small{width:100%}}
+</style>
+</head>
+<body>
+<div class="container">
+<header>
+<div class="brand">
+<div class="logo">SB</div>
+<div>
+<h1>Study Buddy Tracker</h1>
+<div class="note">Simple • Fast • Local (works with Live Server)</div>
+</div>
+</div>
+<div class="controls">
+<button id="seed" class="button ghost">Seed sample</button>
+<button id="clearAll" class="button">Clear All</button>
+</div>
+</header>
+<div class="grid">
+<main>
+<div class="card">
+<h2>Add study session</h2>
+<form id="sessionForm">
+<div class="form-row">
+<input required id="subject" class="input" placeholder="Subject (eg. Math)">
+<input required id="duration" class="input small" type="number" placeholder="Minutes" min="1">
+</div>
+<div class="form-row">
+<input id="date" class="input" type="date">
+<select id="type" class="select small">
+<option value="solo">Solo</option>
+<option value="group">Group</option>
+<option value="review">Review</option>
+</select>
+<button class="button" type="submit">Add</button>
+</div>
+<div class="progress-wrap">
+<label class="note">Daily goal: <span id="goalLabel">120</span> mins</label>
+<div class="progress" aria-hidden="true">
+<div id="progressFill" class="progress-fill"></div>
+</div>
+<div class="note" id="progressText">0 / 120 mins today</div>
+</div>
+</form>
+</div>
+
+<div class="card" style="margin-top:16px">
+<h2>Recent sessions</h2>
+<ul id="sessionsList" class="list"></ul>
+</div>
+</main>
+
+<aside>
+<div class="card summary">
+<h3>Overview</h3>
+<div><strong>Total minutes:</strong> <span id="totalMinutes">0</span></div>
+<div><strong>Sessions:</strong> <span id="countSessions">0</span></div>
+<div class="note">Click the red button to remove a session.</div>
+</div>
+
+<div class="card" style="margin-top:14px">
+<h3>Quick tips</h3>
+<ul>
+<li class="note">Use Live Server: right-click this file → "Open with Live Server"</li>
+<li class="note">This file stores data in your browser (localStorage).</li>
+<li class="note">Change daily goal in code or modify UI below.</li>
+</ul>
+<label class="note">Daily goal (mins)</label>
+<input id="goalInput" class="input small" type="number" value="120" min="10">
+<button id="setGoal" class="button ghost" style="margin-top:8px">Set Goal</button>
+</div>
+
+<div class="footer">Made for VS Code + Live Server • Local-only demo</div>
+</aside>
+</div>
+</div>
+
+<script>
+(()=> {
+const $ = id => document.getElementById(id);
+const sessionForm = $('sessionForm');
+const subjectI = $('subject');
+const durationI = $('duration');
+const dateI = $('date');
+const typeI = $('type');
+const list = $('sessionsList');
+const progressFill = $('progressFill');
+const progressText = $('progressText');
+const goalLabel = $('goalLabel');
+const totalMinutesEl = $('totalMinutes');
+const countSessionsEl = $('countSessions');
+const goalInput = $('goalInput');
+
+let SESSIONS_KEY = 'studybuddy_sessions_v1';
+let GOAL_KEY = 'studybuddy_goal_v1';
+let sessions = JSON.parse(localStorage.getItem(SESSIONS_KEY) || '[]');
+let goal = parseInt(localStorage.getItem(GOAL_KEY) || '120', 10);
+
+goalLabel.textContent = goal;
+goalInput.value = goal;
+
+function isoDate(d) { // return YYYY-MM-DD
+  const z = d ? new Date(d) : new Date();
+  return z.toISOString().slice(0,10);
+}
+
+function save(){ localStorage.setItem(SESSIONS_KEY, JSON.stringify(sessions)); }
+
+function addSession(s){ sessions.unshift(s); save(); render(); }
+
+function removeSession(idx){ sessions.splice(idx,1); save(); render(); }
+
+function computeTotals(){
+  const today = isoDate();
+  const totalToday = sessions.filter(s => s.date === today).reduce((a,b)=>a+b.duration,0);
+  const totalAll = sessions.reduce((a,b)=>a+b.duration,0);
+  return { totalToday, totalAll };
+}
+
+function render(){
+  // list
+  list.innerHTML = '';
+  sessions.forEach((s, i) => {
+    const li = document.createElement('li'); li.className='item';
+    li.innerHTML = `\n      <div class="meta">\n        <div>\n          <div style="font-weight:600">${s.subject}</div>\n          <div class="note">${s.date} • ${s.type}</div>\n        </div>\n      </div>\n      <div style="display:flex;gap:12px;align-items:center">\n        <div class="badge">${s.duration} min</div>\n        <button class="trash" title="Delete" data-i="${i}">×</button>\n      </div>\n    `;
+    list.appendChild(li);
+  });
+  // attach delete handlers
+  list.querySelectorAll('.trash').forEach(btn=>{
+    btn.addEventListener('click', ()=> {
+      const idx = parseInt(btn.dataset.i,10);
+      removeSession(idx);
+    });
+  });
+  const { totalToday, totalAll } = computeTotals();
+  const pct = Math.min(100, Math.round((totalToday / goal) * 100));
+  progressFill.style.width = pct + '%';
+  progressText.textContent = `${totalToday} / ${goal} mins today (${pct}%)`;
+  goalLabel.textContent = goal;
+  totalMinutesEl.textContent = totalAll;
+  countSessionsEl.textContent = sessions.length;
+}
+
+sessionForm.addEventListener('submit', (e)=> {
+  e.preventDefault();
+  const subj = subjectI.value.trim();
+  const duration = parseInt(durationI.value, 10);
+  const date = dateI.value || isoDate();
+  const type = typeI.value;
+  if(!subj || !duration || duration <= 0) {
+    alert('Enter subject and valid minutes');
+    return;
+  }
+  addSession({subject:subj, duration, date, type});
+  sessionForm.reset();
+  dateI.value = ''; // default to today next time
+});
+
+$('seed').addEventListener('click', ()=> {
+  sessions = [
+    {subject:'Math — Calculus', duration:60, date: isoDate(), type:'solo'},
+    {subject:'Physics — Problems', duration:45, date: isoDate(), type:'group'},
+    {subject:'History — Notes', duration:30, date: isoDate(), type:'review'}
+  ].concat(sessions);
+  save(); render();
+});
+
+$('clearAll').addEventListener('click', ()=> {
+  if(confirm('Clear all sessions?')) { sessions = []; save(); render(); }
+});
+
+$('setGoal').addEventListener('click', ()=> {
+  const v = parseInt(goalInput.value,10);
+  if(!v || v < 10) return alert('Goal must be at least 10 minutes');
+  goal = v; localStorage.setItem(GOAL_KEY, String(goal)); render();
+});
+
+// initial render
+if(!sessions.length){
+  // optional gentle seed
+  // sessions = [];
+}
+render();
+
+})();
+</script>
+</body>
+</html>
+
